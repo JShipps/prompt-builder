@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prompt Builder</title>
+<meta name="description" content="Turn a few basic inputs into a well-structured AI prompt.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233b6ef5'/%3E%3Cpath d='M9 11l5 5-5 5M16 22h7' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --field: #ffffff;
+    --border: #dfe2e8;
+    --text: #1b1e24;
+    --muted: #646b78;
+    --accent: #3b6ef5;
+    --accent-text: #ffffff;
+    --accent-soft: #e8eefe;
+    --danger: #c43d3d;
+    --shadow: 0 1px 2px rgba(20, 24, 33, .06), 0 4px 16px rgba(20, 24, 33, .05);
+    --radius: 12px;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181d;
+      --panel: #1e2128;
+      --field: #252932;
+      --border: #333844;
+      --text: #e8eaef;
+      --muted: #9aa1ae;
+      --accent: #6b93ff;
+      --accent-text: #0e1220;
+      --accent-soft: #263257;
+      --danger: #ff7a7a;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 16px rgba(0, 0, 0, .25);
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  [hidden] { display: none !important; }
+  a { color: var(--accent); }
+
+  .top {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 12px 20px;
+    background: color-mix(in srgb, var(--bg) 85%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 17px; }
+  .brand svg { flex: none; }
+  .top .actions { display: flex; gap: 8px; }
+
+  button {
+    font: inherit; font-weight: 550; cursor: pointer;
+    border-radius: 9px; padding: 8px 14px;
+    border: 1px solid var(--border); background: var(--panel); color: var(--text);
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  button:hover { border-color: var(--muted); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  button.primary:hover { filter: brightness(1.08); }
+  button:disabled { opacity: .45; cursor: default; filter: none; }
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+  kbd {
+    font: 11px var(--mono); padding: 1px 5px; border-radius: 5px;
+    background: rgba(255, 255, 255, .2); border: 1px solid rgba(255, 255, 255, .3);
+  }
+
+  .layout {
+    flex: 1;
+    display: grid; grid-template-columns: minmax(340px, 480px) 1fr; gap: 20px;
+    padding: 20px; max-width: 1400px; width: 100%; margin: 0 auto;
+  }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+
+  .form { padding: 20px; display: flex; flex-direction: column; gap: 22px; align-self: start; }
+  fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  legend { font-weight: 650; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 0; margin-bottom: 10px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-weight: 550; font-size: 14px; }
+  .hint { margin: -2px 0 2px; font-size: 13px; color: var(--muted); }
+  input[type=text], input[type=password], select, textarea {
+    font: inherit; color: var(--text); background: var(--field);
+    border: 1px solid var(--border); border-radius: 9px; padding: 9px 11px; width: 100%;
+  }
+  textarea { resize: vertical; min-height: 76px; }
+  #task { min-height: 90px; font-size: 16px; }
+  .row { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+  .detected { font-size: 13px; color: var(--accent); font-weight: 550; }
+  .toggle { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; }
+  .toggle input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
+  .toggle span { display: flex; flex-direction: column; }
+  .toggle small { color: var(--muted); font-size: 13px; }
+  .polish-box {
+    display: flex; flex-direction: column; gap: 14px;
+    padding: 14px; border-radius: 10px; background: var(--accent-soft);
+  }
+  .polish-box .hint a { white-space: nowrap; }
+
+  .output {
+    position: sticky; top: 78px; align-self: start;
+    height: calc(100vh - 98px); min-height: 420px;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .output-body { flex: 1; position: relative; display: flex; min-height: 0; }
+  #output {
+    flex: 1; border: 0; border-radius: 0; resize: none; background: transparent;
+    font: 13.5px/1.6 var(--mono); padding: 22px 24px; min-height: 0;
+  }
+  #output:focus-visible { outline: none; }
+  .empty, .busy {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; gap: 10px; padding: 24px; color: var(--muted);
+  }
+  .empty h2 { margin: 0; color: var(--text); font-size: 19px; }
+  .empty p { margin: 0; max-width: 320px; }
+  .spinner {
+    width: 40px; height: 40px; border-radius: 50%;
+    border: 4px solid var(--border); border-top-color: var(--accent);
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
+  .outbar {
+    display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 18px;
+    border-top: 1px solid var(--border);
+  }
+  #status { flex: 1; font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px);
+    max-width: min(560px, calc(100vw - 32px));
+    background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px;
+    font-size: 14px; box-shadow: var(--shadow); opacity: 0; pointer-events: none;
+    transition: opacity .2s, transform .2s; z-index: 20;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.error { background: var(--danger); color: #fff; }
+
+  .foot { text-align: center; font-size: 13px; color: var(--muted); padding: 0 16px 20px; }
+
+  @media (max-width: 860px) {
+    .top { padding: 10px 16px; }
+    .layout { grid-template-columns: 1fr; padding: 16px; gap: 16px; }
+    .output { position: static; height: auto; min-height: 360px; }
+    #output { min-height: 340px; }
+    .top kbd { display: none; }
+  }
+</style>
+<script src="templates.js"></script>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="var(--accent)"/><path d="M9 11l5 5-5 5M16 22h7" stroke="var(--accent-text)" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Prompt Builder
+  </div>
+  <div class="actions">
+    <button id="clear" type="button" title="Clear all fields">Clear</button>
+    <button id="generate" type="button" class="primary" title="Generate (Ctrl+Enter)">Generate <kbd>Ctrl ↵</kbd></button>
+  </div>
+</header>
+
+<main class="layout">
+  <form id="form" class="panel form" autocomplete="off">
+    <fieldset>
+      <legend>What should the AI do?</legend>
+      <div class="field">
+        <label for="task">Task <span class="hint">(required)</span></label>
+        <textarea id="task" placeholder="e.g. Design a landing page for my bakery"></textarea>
+      </div>
+      <div class="field">
+        <div class="row"><label for="type">Prompt type</label><span id="detected" class="detected"></span></div>
+        <select id="type"></select>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Details (all optional)</legend>
+      <div class="field" data-field="goal"><label for="goal" data-label="goal"></label><input id="goal" type="text"></div>
+      <div class="field" data-field="audience"><label for="audience" data-label="audience"></label><input id="audience" type="text"></div>
+      <div class="field" data-field="tone"><label for="tone" data-label="tone"></label><input id="tone" type="text"></div>
+      <div class="field" data-field="length"><label for="length">Length</label>
+        <select id="length"><option value="">Any</option><option value="short">Short</option><option value="medium">Medium</option><option value="long">Long</option></select>
+      </div>
+      <div class="field" data-field="format"><label for="format" data-label="format"></label><input id="format" type="text"></div>
+      <div class="field" data-field="role"><label for="role" data-label="role"></label><input id="role" type="text"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Background and rules</legend>
+      <div class="field" data-field="context"><label for="context" data-label="context"></label><p class="hint" data-hint="context"></p><textarea id="context"></textarea></div>
+      <div class="field" data-field="rules"><label for="rules" data-label="rules"></label><p class="hint" data-hint="rules"></p><textarea id="rules"></textarea></div>
+      <div class="field" data-field="example"><label for="example" data-label="example"></label><p class="hint" data-hint="example"></p><textarea id="example"></textarea></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Options</legend>
+      <label class="toggle" data-field="input_slot"><input id="input_slot" type="checkbox">
+        <span>Add a paste-your-input placeholder<small>Adds {{PASTE YOUR INPUT HERE}} so you can reuse the prompt.</small></span></label>
+      <label class="toggle"><input id="polish" type="checkbox">
+        <span>Polish with Claude<small>Claude rewrites the draft to make it clearer. Needs your own Anthropic API key.</small></span></label>
+      <div id="polish-box" class="polish-box" hidden>
+        <div class="field"><label for="model">Model</label><select id="model"></select></div>
+        <div class="field">
+          <label for="apikey">Anthropic API key</label>
+          <p class="hint">Get one at <a href="https://console.anthropic.com/" target="_blank" rel="noopener">console.anthropic.com</a>. It goes straight from your browser to Anthropic and nowhere else.</p>
+          <input id="apikey" type="password" placeholder="sk-ant-…" spellcheck="false">
+        </div>
+        <label class="toggle"><input id="remember" type="checkbox"><span>Remember my key on this device</span></label>
+      </div>
+    </fieldset>
+  </form>
+
+  <section class="panel output" aria-label="Generated prompt">
+    <div class="output-body">
+      <div id="empty" class="empty">
+        <h2>No prompt yet</h2>
+        <p>Describe the task, add any details you like, then press Generate.</p>
+      </div>
+      <div id="busy" class="busy" hidden><div class="spinner"></div><span id="busy-text">Polishing with Claude…</span></div>
+      <textarea id="output" spellcheck="false" aria-label="Prompt (editable)" hidden></textarea>
+    </div>
+    <footer class="outbar">
+      <span id="status"></span>
+      <button id="download" type="button" disabled>Download</button>
+      <button id="copy" type="button" class="primary" disabled>Copy</button>
+    </footer>
+  </section>
+</main>
+<p class="foot">Open source: <a href="https://github.com/JShipps/prompt-builder">github.com/JShipps/prompt-builder</a></p>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script type="module">
+const T = window.PROMPT_TEMPLATES;
+const SDK_URL = "https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@1.3.0/+esm";
+const KEY_STORE = "promptbuilder.apikey";
+const $ = (id) => document.getElementById(id);
+let lastTask = "";
+let busy = false;
+
+// ---------- storage (best effort: may be blocked in private windows) ----------
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
+};
+
+// ---------- prompt building (mirrors promptgen.py) ----------
+const trimDots = (s) => s.trim().replace(/\.+$/, "");
+const section = (tag, body) => `<${tag}>\n${body}\n</${tag}>`;
+
+function guessType(text) {
+  const t = text.toLowerCase();
+  for (const [kind, pattern] of T.detect) if (new RegExp(pattern).test(t)) return kind;
+  return "general";
+}
+
+function buildPrompt(o) {
+  const spec = T.types[o.type];
+  const task = o.task.trim();
+  o = { ...o, task: task.charAt(0).toUpperCase() + task.slice(1) };
+  if (spec.image) return buildImagePrompt(o);
+
+  const parts = [`You are ${o.role.trim() || spec.role}.`];
+  const taskLines = [trimDots(o.task) + "."];
+  if (o.goal.trim()) taskLines.push(`The goal is: ${trimDots(o.goal)}.`);
+  if (o.audience.trim()) taskLines.push(`The audience is ${trimDots(o.audience)}.`);
+  parts.push(section("task", taskLines.join(" ")));
+
+  if (o.context.trim()) parts.push(section(spec.context_tag || "context", o.context.trim()));
+
+  const guidelines = [...spec.guidelines];
+  if (o.tone.trim()) guidelines.push((spec.tone_line || "Use a {tone} tone.").replace("{tone}", o.tone.trim()));
+  if (o.length) guidelines.push(T.lengths[o.length] || o.length);
+  guidelines.push(...o.constraints);
+  if (guidelines.length) parts.push(section("guidelines", guidelines.map((g) => `- ${g}`).join("\n")));
+
+  if (o.example.trim()) parts.push(section("example",
+    o.example.trim() + "\n\nUse this as a guide to style and structure, not content to copy."));
+  parts.push(section("output_format", (o.format.trim() || spec.format).trim()));
+  if (o.input_slot) parts.push(section("input", "{{PASTE YOUR INPUT HERE}}"));
+  return parts.join("\n\n");
+}
+
+function buildImagePrompt(o) {
+  const bits = [trimDots(o.task)];
+  if (o.context.trim()) bits.push(trimDots(o.context));
+  if (o.tone.trim()) bits.push(`${o.tone.trim()} atmosphere`);
+  bits.push(o.format.trim() ? trimDots(o.format) : "highly detailed, balanced composition, natural lighting");
+  let text = bits.join(", ") + ".";
+  if (o.constraints.length) text += "\n\nAvoid: " + o.constraints.join(", ") + ".";
+  return text;
+}
+
+// ---------- polishing with Claude ----------
+class PolishError extends Error {}
+
+async function polish(draft, kind, model, apiKey) {
+  let Anthropic;
+  try {
+    ({ default: Anthropic } = await import(SDK_URL));
+  } catch {
+    throw new PolishError("couldn't load Anthropic's library. Check your internet connection.");
+  }
+  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
+  let response;
+  try {
+    response = await client.beta.messages.create({
+      model,
+      max_tokens: 16000,
+      output_config: { effort: "medium" },
+      // If the model declines, let the API retry on a fallback model.
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+      system: T.polish_system,
+      messages: [{ role: "user", content: `Prompt type: ${kind}\n\n<draft_prompt>\n${draft}\n</draft_prompt>` }],
+    });
+  } catch (e) {
+    if (e instanceof Anthropic.AuthenticationError) throw new PolishError("the API key was rejected. Check it and try again.");
+    if (e instanceof Anthropic.NotFoundError) throw new PolishError(`model "${model}" wasn't found.`);
+    if (e instanceof Anthropic.RateLimitError) throw new PolishError("rate limited by the API. Try again in a minute.");
+    if (e instanceof Anthropic.APIConnectionError) throw new PolishError("couldn't reach the API. Check your internet connection.");
+    if (e instanceof Anthropic.APIError) throw new PolishError(`API error ${e.status ?? ""}: ${e.message}`);
+    throw e;
+  }
+  if (response.stop_reason === "refusal") throw new PolishError("Claude declined to polish this prompt.");
+  const text = response.content.filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+  if (!text) throw new PolishError("Claude returned an empty response.");
+  if (response.stop_reason === "max_tokens") throw new PolishError("the response was cut off before it finished.");
+  return text;
+}
+
+// ---------- UI ----------
+function currentType() {
+  const choice = $("type").value;
+  if (choice !== "auto") return { kind: choice, auto: false };
+  const text = `${$("task").value} ${$("format").value}`.trim();
+  return { kind: text ? guessType(text) : "general", auto: true };
+}
+
+function refreshType() {
+  const { kind, auto } = currentType();
+  const spec = T.types[kind];
+  $("detected").textContent = auto && $("task").value.trim() ? `Detected: ${spec.name}` : "";
+  const labels = { ...T.default_labels, ...(spec.labels || {}) };
+  const hidden = new Set(spec.hide || []);
+  document.querySelectorAll("[data-field]").forEach((el) => { el.hidden = hidden.has(el.dataset.field); });
+  document.querySelectorAll("[data-label]").forEach((el) => {
+    const l = labels[el.dataset.label];
+    el.textContent = Array.isArray(l) ? l[0] : l;
+  });
+  document.querySelectorAll("[data-hint]").forEach((el) => {
+    const l = labels[el.dataset.hint];
+    el.textContent = Array.isArray(l) ? l[1] : "";
+    el.hidden = !el.textContent;
+  });
+}
+
+function collect() {
+  const task = $("task").value.trim();
+  if (!task) { toast("Describe the task first."); $("task").focus(); return null; }
+  return {
+    task,
+    type: currentType().kind,
+    goal: $("goal").value, audience: $("audience").value, tone: $("tone").value,
+    length: $("length").value, format: $("format").value, role: $("role").value,
+    context: $("context").value, example: $("example").value,
+    constraints: $("rules").value.split("\n").map((l) => l.replace(/^[\s\-•*]+|[\s\-•*]+$/g, "")).filter(Boolean),
+    input_slot: $("input_slot").checked,
+  };
+}
+
+function setView(view) {
+  $("empty").hidden = view !== "empty";
+  $("busy").hidden = view !== "busy";
+  $("output").hidden = view !== "output";
+  $("copy").disabled = $("download").disabled = view !== "output";
+  $("generate").disabled = view === "busy";
+}
+
+let toastTimer;
+function toast(message, { error = false, ms = 3000 } = {}) {
+  const el = $("toast");
+  el.textContent = message;
+  el.classList.toggle("error", error);
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("show"), ms);
+}
+
+function showResult(text, label) {
+  $("output").value = text;
+  $("status").textContent = label;
+  setView("output");
+  if (window.matchMedia("(max-width: 860px)").matches) $("output").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function generate() {
+  if (busy) return;
+  const opts = collect();
+  if (!opts) return;
+  lastTask = opts.task;
+  const draft = buildPrompt(opts);
+  const label = `${T.types[opts.type].name} prompt`;
+
+  if (!$("polish").checked) return showResult(draft, label);
+
+  const key = $("apikey").value.trim();
+  if (!key) {
+    toast("Paste your Anthropic API key to polish, or turn polishing off.", { error: true, ms: 5000 });
+    $("apikey").focus();
+    return;
+  }
+  if ($("remember").checked) store.set(KEY_STORE, key);
+  const model = $("model").value;
+  busy = true;
+  $("busy-text").textContent = `Polishing with ${model}…`;
+  setView("busy");
+  try {
+    showResult(await polish(draft, opts.type, model, key), `${label} · polished by ${model}`);
+  } catch (e) {
+    showResult(draft, label);
+    const msg = e instanceof PolishError ? e.message : `unexpected error: ${e.message || e}`;
+    toast(`Couldn't polish: ${msg} Showing the unpolished prompt.`, { error: true, ms: 8000 });
+  } finally {
+    busy = false;
+    $("generate").disabled = false;
+  }
+}
+
+async function copyOutput() {
+  const text = $("output").value;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    $("output").select();
+    document.execCommand("copy");
+  }
+  toast("Copied to clipboard");
+}
+
+function downloadOutput() {
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[-:]/g, "").replace("T", "-");
+  const slug = lastTask.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "prompt";
+  const url = URL.createObjectURL(new Blob([$("output").value + "\n"], { type: "text/plain" }));
+  const a = Object.assign(document.createElement("a"), { href: url, download: `${stamp}-${slug}.txt` });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function clearForm() {
+  $("form").querySelectorAll("input[type=text], textarea").forEach((el) => { el.value = ""; });
+  $("type").value = "auto";
+  $("length").value = "";
+  $("input_slot").checked = false;
+  refreshType();
+  $("task").focus();
+}
+
+// ---------- wire up ----------
+$("type").append(new Option("Auto-detect", "auto"),
+  ...Object.entries(T.types).map(([k, t]) => new Option(t.name, k)));
+$("model").append(...T.models.map((m) => new Option(m, m)));
+
+const savedKey = store.get(KEY_STORE);
+if (savedKey) { $("apikey").value = savedKey; $("remember").checked = true; }
+
+["task", "format"].forEach((id) => $(id).addEventListener("input", refreshType));
+$("type").addEventListener("change", refreshType);
+$("polish").addEventListener("change", () => { $("polish-box").hidden = !$("polish").checked; });
+$("remember").addEventListener("change", () => {
+  if (!$("remember").checked) { store.del(KEY_STORE); toast("Your key won't be remembered on this device."); }
+});
+$("generate").addEventListener("click", generate);
+$("clear").addEventListener("click", clearForm);
+$("copy").addEventListener("click", copyOutput);
+$("download").addEventListener("click", downloadOutput);
+$("form").addEventListener("submit", (e) => { e.preventDefault(); generate(); });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); generate(); }
+});
+
+refreshType();
+setView("empty");
+$("task").focus();
+</script>
+</body>
+</html>

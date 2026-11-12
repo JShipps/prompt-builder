@@ -1,0 +1,10 @@
+# Local Python environment and caches
+.venv/
+__pycache__/
+*.pyc
+
+# Your saved prompts stay on your computer
+prompts/
+
+# Local editor and tool settings
+.claude/
